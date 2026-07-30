@@ -1,7 +1,10 @@
 use raylib::prelude::*;
 use std::thread;
 use std::time::Duration;
- 
+
+const DEAD_COLOR: Color = Color::new(68, 1, 84, 255);
+const ALIVE_COLOR: Color = Color::new(253, 231, 37, 255);
+
 struct Framebuffer {
     width: i32,
     height: i32,
@@ -9,67 +12,67 @@ struct Framebuffer {
     current_color: Color,
     background_color: Color,
 }
- 
+
 impl Framebuffer {
     fn new(width: u32, height: u32) -> Self {
-        let background_color = Color::BLACK;
+        let background_color = DEAD_COLOR;
         let image = Image::gen_image_color(width as i32, height as i32, background_color);
         Framebuffer {
             width: width as i32,
             height: height as i32,
             image,
-            current_color: Color::WHITE,
+            current_color: ALIVE_COLOR,
             background_color,
         }
     }
- 
+
     fn set_background_color(&mut self, color: Color) {
         self.background_color = color;
     }
- 
+
     fn set_current_color(&mut self, color: Color) {
         self.current_color = color;
     }
- 
+
     fn clear(&mut self) {
         self.image = Image::gen_image_color(self.width, self.height, self.background_color);
     }
- 
+
     fn point(&mut self, x: i32, y: i32) {
         if x >= 0 && x < self.width && y >= 0 && y < self.height {
             self.image.draw_pixel(x, y, self.current_color);
         }
     }
- 
+
     fn get_color(&mut self, x: i32, y: i32) -> Color {
         self.image.get_color(x, y)
     }
- 
+
     fn export_image(&self, filename: &str) {
         self.image.export_image(filename);
     }
- 
+
     fn swap_buffers(&mut self, window: &mut RaylibHandle, thread: &RaylibThread) {
         let screen_w = window.get_screen_width() as f32;
         let screen_h = window.get_screen_height() as f32;
- 
+
         let texture = window
             .load_texture_from_image(thread, &self.image)
             .expect("No se pudo crear la textura del framebuffer");
- 
+
         let mut d = window.begin_drawing(thread);
         d.clear_background(Color::BLACK);
- 
+
         let source = Rectangle::new(0.0, 0.0, self.width as f32, self.height as f32);
         let dest = Rectangle::new(0.0, 0.0, screen_w, screen_h);
         d.draw_texture_pro(&texture, source, dest, Vector2::new(0.0, 0.0), 0.0, Color::WHITE);
     }
 }
- 
+
 fn is_alive(color: Color) -> bool {
-    color.r > 128
+    color.g > 100
 }
- 
+
 fn count_alive_neighbors(fb: &mut Framebuffer, x: i32, y: i32, wrap: bool) -> u8 {
     let mut count = 0;
     for dy in -1..=1 {
@@ -77,20 +80,14 @@ fn count_alive_neighbors(fb: &mut Framebuffer, x: i32, y: i32, wrap: bool) -> u8
             if dx == 0 && dy == 0 {
                 continue;
             }
- 
             let (nx, ny) = if wrap {
-                (
-                    (x + dx).rem_euclid(fb.width),
-                    (y + dy).rem_euclid(fb.height),
-                )
+                ((x + dx).rem_euclid(fb.width), (y + dy).rem_euclid(fb.height))
             } else {
                 (x + dx, y + dy)
             };
- 
             if nx < 0 || nx >= fb.width || ny < 0 || ny >= fb.height {
                 continue;
             }
- 
             if is_alive(fb.get_color(nx, ny)) {
                 count += 1;
             }
@@ -98,12 +95,12 @@ fn count_alive_neighbors(fb: &mut Framebuffer, x: i32, y: i32, wrap: bool) -> u8
     }
     count
 }
- 
+
 fn step_game_of_life(fb: &mut Framebuffer, wrap: bool) {
     let width = fb.width;
     let height = fb.height;
     let mut next_alive = vec![false; (width * height) as usize];
- 
+
     for y in 0..height {
         for x in 0..width {
             let alive = is_alive(fb.get_color(x, y));
@@ -112,77 +109,74 @@ fn step_game_of_life(fb: &mut Framebuffer, wrap: bool) {
             next_alive[(y * width + x) as usize] = will_live;
         }
     }
- 
+
     for y in 0..height {
         for x in 0..width {
             let alive = next_alive[(y * width + x) as usize];
-            fb.set_current_color(if alive { Color::WHITE } else { Color::BLACK });
+            fb.set_current_color(if alive { ALIVE_COLOR } else { DEAD_COLOR });
             fb.point(x, y);
         }
     }
 }
- 
+
 fn block(fb: &mut Framebuffer, x: i32, y: i32) {
-    fb.set_current_color(Color::WHITE);
+    fb.set_current_color(ALIVE_COLOR);
     for (dx, dy) in [(0, 0), (1, 0), (0, 1), (1, 1)] {
         fb.point(x + dx, y + dy);
     }
 }
- 
+
 fn beehive(fb: &mut Framebuffer, x: i32, y: i32) {
-    fb.set_current_color(Color::WHITE);
+    fb.set_current_color(ALIVE_COLOR);
     for (dx, dy) in [(1, 0), (2, 0), (0, 1), (3, 1), (1, 2), (2, 2)] {
         fb.point(x + dx, y + dy);
     }
 }
- 
+
 fn loaf(fb: &mut Framebuffer, x: i32, y: i32) {
-    fb.set_current_color(Color::WHITE);
+    fb.set_current_color(ALIVE_COLOR);
     for (dx, dy) in [(1, 0), (2, 0), (0, 1), (3, 1), (1, 2), (3, 2), (2, 3)] {
         fb.point(x + dx, y + dy);
     }
 }
- 
+
 fn boat(fb: &mut Framebuffer, x: i32, y: i32) {
-    fb.set_current_color(Color::WHITE);
+    fb.set_current_color(ALIVE_COLOR);
     for (dx, dy) in [(0, 0), (1, 0), (0, 1), (2, 1), (1, 2)] {
         fb.point(x + dx, y + dy);
     }
 }
- 
+
 fn tub(fb: &mut Framebuffer, x: i32, y: i32) {
-    fb.set_current_color(Color::WHITE);
+    fb.set_current_color(ALIVE_COLOR);
     for (dx, dy) in [(1, 0), (0, 1), (2, 1), (1, 2)] {
         fb.point(x + dx, y + dy);
     }
 }
- 
+
 fn blinker(fb: &mut Framebuffer, x: i32, y: i32) {
-    fb.set_current_color(Color::WHITE);
+    fb.set_current_color(ALIVE_COLOR);
     for (dx, dy) in [(0, 0), (0, 1), (0, 2)] {
         fb.point(x + dx, y + dy);
     }
 }
- 
+
 fn toad(fb: &mut Framebuffer, x: i32, y: i32) {
-    fb.set_current_color(Color::WHITE);
+    fb.set_current_color(ALIVE_COLOR);
     for (dx, dy) in [(1, 0), (2, 0), (3, 0), (0, 1), (1, 1), (2, 1)] {
         fb.point(x + dx, y + dy);
     }
 }
- 
+
 fn beacon(fb: &mut Framebuffer, x: i32, y: i32) {
-    fb.set_current_color(Color::WHITE);
-    for (dx, dy) in [
-        (0, 0), (1, 0), (0, 1), (1, 1),
-        (2, 2), (3, 2), (2, 3), (3, 3),
-    ] {
+    fb.set_current_color(ALIVE_COLOR);
+    for (dx, dy) in [(0, 0), (1, 0), (0, 1), (1, 1), (2, 2), (3, 2), (2, 3), (3, 3)] {
         fb.point(x + dx, y + dy);
     }
 }
- 
+
 fn pulsar(fb: &mut Framebuffer, x: i32, y: i32) {
-    fb.set_current_color(Color::WHITE);
+    fb.set_current_color(ALIVE_COLOR);
     let arm = [
         (2, 0), (3, 0), (4, 0),
         (0, 2), (5, 2), (0, 3), (5, 3), (0, 4), (5, 4),
@@ -195,16 +189,16 @@ fn pulsar(fb: &mut Framebuffer, x: i32, y: i32) {
         fb.point(x - dx, y - dy);
     }
 }
- 
+
 fn glider(fb: &mut Framebuffer, x: i32, y: i32) {
-    fb.set_current_color(Color::WHITE);
+    fb.set_current_color(ALIVE_COLOR);
     for (dx, dy) in [(1, 0), (2, 1), (0, 2), (1, 2), (2, 2)] {
         fb.point(x + dx, y + dy);
     }
 }
- 
+
 fn lwss(fb: &mut Framebuffer, x: i32, y: i32) {
-    fb.set_current_color(Color::WHITE);
+    fb.set_current_color(ALIVE_COLOR);
     for (dx, dy) in [
         (1, 0), (4, 0),
         (0, 1),
@@ -214,9 +208,9 @@ fn lwss(fb: &mut Framebuffer, x: i32, y: i32) {
         fb.point(x + dx, y + dy);
     }
 }
- 
+
 fn gosper_glider_gun(fb: &mut Framebuffer, x: i32, y: i32) {
-    fb.set_current_color(Color::WHITE);
+    fb.set_current_color(ALIVE_COLOR);
     let cells = [
         (0, 4), (0, 5), (1, 4), (1, 5),
         (10, 4), (10, 5), (10, 6),
@@ -237,47 +231,58 @@ fn gosper_glider_gun(fb: &mut Framebuffer, x: i32, y: i32) {
         fb.point(x + dx, y + dy);
     }
 }
- 
+
 fn setup_initial_pattern(fb: &mut Framebuffer) {
-    fb.set_background_color(Color::BLACK);
+    fb.set_background_color(DEAD_COLOR);
     fb.clear();
- 
+
+    // patrones repartidos por toda la cuadricula para llenar bien la pantalla
     block(fb, 5, 5);
     beehive(fb, 15, 5);
     loaf(fb, 26, 5);
     boat(fb, 37, 5);
-    tub(fb, 45, 5);
- 
+    tub(fb, 45, 90);
+    block(fb, 100, 10);
+    beehive(fb, 120, 20);
+
     blinker(fb, 5, 20);
     toad(fb, 15, 20);
     beacon(fb, 26, 20);
     pulsar(fb, 45, 25);
- 
+    blinker(fb, 90, 60);
+    toad(fb, 60, 90);
+    beacon(fb, 110, 80);
+    pulsar(fb, 15, 70);
+
     glider(fb, 5, 45);
     glider(fb, 60, 60);
+    glider(fb, 100, 100);
+    glider(fb, 130, 40);
     lwss(fb, 20, 50);
- 
+    lwss(fb, 80, 110);
+
     gosper_glider_gun(fb, 90, 10);
+    gosper_glider_gun(fb, 10, 100);
 }
- 
+
 fn main() {
     let grid_width = 150;
-    let grid_height = 100;
-    let scale = 7;
- 
+    let grid_height = 130;
+    let scale = 6;
+
     let (mut window, raylib_thread) = raylib::init()
         .size(grid_width * scale, grid_height * scale)
         .resizable()
         .title("Lab 2 - Game of Life")
         .log_level(TraceLogLevel::LOG_WARNING)
         .build();
- 
+
     let mut framebuffer = Framebuffer::new(grid_width as u32, grid_height as u32);
     setup_initial_pattern(&mut framebuffer);
- 
+
     let wrap_edges = true;
     let mut screenshot_count = 0;
- 
+
     while !window.window_should_close() {
         if window.is_key_pressed(KeyboardKey::KEY_P) {
             screenshot_count += 1;
@@ -285,15 +290,15 @@ fn main() {
             framebuffer.export_image(&filename);
             println!("Screenshot guardado como '{}'", filename);
         }
- 
+
         if window.is_key_pressed(KeyboardKey::KEY_R) {
             setup_initial_pattern(&mut framebuffer);
         }
- 
+
         step_game_of_life(&mut framebuffer, wrap_edges);
- 
+
         framebuffer.swap_buffers(&mut window, &raylib_thread);
- 
+
         thread::sleep(Duration::from_millis(80));
     }
 }
